@@ -31,12 +31,17 @@ import {
   MeshBasicMaterial,
   Group,
   BackSide,
+  BoxBufferGeometry,
+  MeshStandardMaterial,
+  VERSION
 } from 'three';
 import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
+RectAreaLightUniformsLib.init()
 // import { RoughnessMipmapper } from 'three/examples/jsm/utils/RoughnessMipmapper.js';
 
 import { GUI } from 'dat.gui';
@@ -60,6 +65,8 @@ const MAP_NAMES = [
   'roughnessMap',
   'specularMap',
 ];
+
+console.log(VERSION)
 
 const Preset = {ASSET_GENERATOR: 'assetgenerator'};
 
@@ -435,14 +442,14 @@ export class Viewer {
 
     let top = RectLight(0xFFFFFF, 1, 10, 20)
     top.rotation.x = Math.PI * -0.5
-    top.position.y = 3
-    SVGFEDropShadowElement;SVGDefsElement;;
-    let left = RectLight(0xFFFFFF, 1, 10, 5)
-    left.position.z = 10
+    top.position.y = 5
+    
+    let left = RectLight(0xFFFFFF, 1, 10, 4)
+    left.position.z = 13
 
-    let right = RectLight(0xFFFFFF, 1, 10, 5)
+    let right = RectLight(0xFFFFFF, 1, 10, 4)
     right.rotation.y = Math.PI
-    right.position.z = -10
+    right.position.z = -13
     // let right = new RectAreaLight()
 
     this.scene.add(top)
@@ -456,6 +463,9 @@ export class Viewer {
     //   this.lights.push(hemiLight);
     //   return;
     // }
+
+    window.boxx =  new Mesh(new BoxBufferGeometry(1, 1, 1, 10, 10, 10), new MeshStandardMaterial({roughness:0, metalness:1}))
+    this.scene.add( window.boxx)
 
     // const light1  = new AmbientLight(state.ambientColor, state.ambientIntensity);
     // light1.name = 'ambient_light';
@@ -524,13 +534,16 @@ export class Viewer {
     }
 
     traverseMaterials(this.content, (material) => {
+      material.roughness = 0.0;
+      material.metalness = 1.0;
       material.wireframe = this.state.wireframe;
     });
+    window.boxx.material.wireframe = this.state.wireframe;
   
 
     this.content.traverse((node) => {
-      if(node.isMesh && node.material && node.material.aoMap && !node.geometry.attributes.uv2){
-        console.log(node.material.aoMap)
+      if(node.isMesh && node.material && node.material.map){
+        console.log(node.material)
       }
       if (node.isMesh && node.skeleton && this.state.skeleton) {
         

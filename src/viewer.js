@@ -427,7 +427,7 @@ export class Viewer {
 
     let RectLight = (color, intensity, w, h) => {
       let light = new RectAreaLight(color, intensity, w, h)
-      light.add(new Mesh(new PlaneBufferGeometry(w*.5, h*.5), new MeshBasicMaterial({color, side:BackSide})))
+      light.add(new Mesh(new PlaneBufferGeometry(w, h), new MeshBasicMaterial({color, side:BackSide})))
       return light
     }
 
@@ -526,9 +526,14 @@ export class Viewer {
     traverseMaterials(this.content, (material) => {
       material.wireframe = this.state.wireframe;
     });
+  
 
     this.content.traverse((node) => {
+      if(node.isMesh && node.material && node.material.aoMap && !node.geometry.attributes.uv2){
+        console.log(node.material.aoMap)
+      }
       if (node.isMesh && node.skeleton && this.state.skeleton) {
+        
         const helper = new SkeletonHelper(node.skeleton.bones[0].parent);
         helper.material.linewidth = 3;
         this.scene.add(helper);

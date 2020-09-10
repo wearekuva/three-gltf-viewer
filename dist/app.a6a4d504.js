@@ -44650,7 +44650,7 @@ function () {
       };
 
       var state = this.state;
-      var top = RectLight(0xFFFFFF, 1, 10, 20);
+      var top = RectLight(0xFFFFFF, 5, 10, 20);
       top.rotation.x = Math.PI * -0.5;
       top.position.y = 5;
       var left = RectLight(0xFFFFFF, 1, 10, 4);

@@ -443,7 +443,7 @@ export class Viewer {
 
     const state = this.state;
 
-    let top = RectLight(0xFFFFFF, 1, 10, 20)
+    let top = RectLight(0xFFFFFF, 5, 10, 20)
     top.rotation.x = Math.PI * -0.5
     top.position.y = 5
     

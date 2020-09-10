@@ -43274,7 +43274,7 @@ function () {
     this.state = {
       environment: options.preset === Preset.ASSET_GENERATOR ? _index.environments.find(function (e) {
         return e.id === 'footprint-court';
-      }).name : _index.environments[1].name,
+      }).name : _index.environments[0].name,
       background: false,
       playbackSpeed: 1.0,
       actionStates: {},
@@ -43284,7 +43284,7 @@ function () {
       grid: false,
       // Lights
       addLights: true,
-      exposure: 1.0,
+      toneMappingExposure: 1.0,
       textureEncoding: 'sRGB',
       ambientIntensity: 0.3,
       ambientColor: 0xFFFFFF,
@@ -43576,9 +43576,10 @@ function () {
         this.addLights();
       } else if (!state.addLights && lights.length) {
         this.removeLights();
-      }
+      } // debugger
 
-      this.renderer.toneMappingExposure = state.exposure;
+
+      this.renderer.toneMappingExposure = state.toneMappingExposure;
 
       if (lights.length === 2) {
         lights[0].intensity = state.ambientIntensity;
@@ -43590,25 +43591,46 @@ function () {
   }, {
     key: "addLights",
     value: function addLights() {
+      var RectLight = function RectLight(color, intensity, w, h) {
+        var light = new _three.RectAreaLight(color, intensity, w, h);
+        light.add(new _three.Mesh(new _three.PlaneBufferGeometry(w * .5, h * .5), new _three.MeshBasicMaterial({
+          color: color,
+          side: _three.BackSide
+        })));
+        return light;
+      };
+
       var state = this.state;
+      var top = RectLight(0xFFFFFF, 1, 10, 20);
+      top.rotation.x = Math.PI * -0.5;
+      top.position.y = 3;
+      SVGFEDropShadowElement;
+      SVGDefsElement;
+      ;
+      var left = RectLight(0xFFFFFF, 1, 10, 5);
+      left.position.z = 10;
+      var right = RectLight(0xFFFFFF, 1, 10, 5);
+      right.rotation.y = Math.PI;
+      right.position.z = -10; // let right = new RectAreaLight()
 
-      if (this.options.preset === Preset.ASSET_GENERATOR) {
-        var hemiLight = new _three.HemisphereLight();
-        hemiLight.name = 'hemi_light';
-        this.scene.add(hemiLight);
-        this.lights.push(hemiLight);
-        return;
-      }
+      this.scene.add(top);
+      this.scene.add(left);
+      this.scene.add(right); // if (this.options.preset === Preset.ASSET_GENERATOR) {
+      //   const hemiLight = new HemisphereLight();
+      //   hemiLight.name = 'hemi_light';
+      //   this.scene.add(hemiLight);
+      //   this.lights.push(hemiLight);
+      //   return;
+      // }
+      // const light1  = new AmbientLight(state.ambientColor, state.ambientIntensity);
+      // light1.name = 'ambient_light';
+      // this.defaultCamera.add( light1 );
+      // const light2  = new DirectionalLight(state.directColor, state.directIntensity);
+      // light2.position.set(0.5, 0, 0.866); // ~60º
+      // light2.name = 'main_light';
+      // this.defaultCamera.add( light2 );
 
-      var light1 = new _three.AmbientLight(state.ambientColor, state.ambientIntensity);
-      light1.name = 'ambient_light';
-      this.defaultCamera.add(light1);
-      var light2 = new _three.DirectionalLight(state.directColor, state.directIntensity);
-      light2.position.set(0.5, 0, 0.866); // ~60º
-
-      light2.name = 'main_light';
-      this.defaultCamera.add(light2);
-      this.lights.push(light1, light2);
+      this.lights.push(top, left);
     }
   }, {
     key: "removeLights",
@@ -43796,13 +43818,31 @@ function () {
           material.needsUpdate = true;
         });
       });
+      lightFolder.add(this.renderer, 'toneMapping', {
+        none: _three.NoToneMapping,
+        Linear: _three.LinearToneMapping,
+        Reinhard: _three.ReinhardToneMapping,
+        Cineon: _three.CineonToneMapping,
+        Aces: _three.ACESFilmicToneMapping
+      }).onChange(function () {
+        _this9.renderer.toneMapping = Number(_this9.renderer.toneMapping);
+        traverseMaterials(_this9.content, function (material) {
+          material.needsUpdate = true;
+        });
+      });
+      lightFolder.add(this.renderer, 'physicallyCorrectLights').onChange(function () {
+        _this9.renderer.toneMapping = Number(_this9.renderer.toneMapping);
+        traverseMaterials(_this9.content, function (material) {
+          material.needsUpdate = true;
+        });
+      });
       var envMapCtrl = lightFolder.add(this.state, 'environment', _index.environments.map(function (env) {
         return env.name;
       }));
       envMapCtrl.onChange(function () {
         return _this9.updateEnvironment();
       });
-      [lightFolder.add(this.state, 'exposure', 0, 2), lightFolder.add(this.state, 'addLights').listen(), lightFolder.add(this.state, 'ambientIntensity', 0, 2), lightFolder.addColor(this.state, 'ambientColor'), lightFolder.add(this.state, 'directIntensity', 0, 4), // TODO(#116)
+      [lightFolder.add(this.state, 'toneMappingExposure', 0, 2), lightFolder.add(this.state, 'addLights').listen(), lightFolder.add(this.state, 'ambientIntensity', 0, 2), lightFolder.addColor(this.state, 'ambientColor'), lightFolder.add(this.state, 'directIntensity', 0, 4), // TODO(#116)
       lightFolder.addColor(this.state, 'directColor')].forEach(function (ctrl) {
         return ctrl.onChange(function () {
           return _this9.updateLights();
@@ -66918,7 +66958,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "65155" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "57033" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

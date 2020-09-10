@@ -1,4 +1,9 @@
 import {
+  NoToneMapping,
+  LinearToneMapping,
+  ReinhardToneMapping,
+  CineonToneMapping,
+  ACESFilmicToneMapping,
   AmbientLight,
   AnimationMixer,
   AxesHelper,
@@ -15,11 +20,17 @@ import {
   PerspectiveCamera,
   RGBFormat,
   Scene,
+  RectAreaLight,
   SkeletonHelper,
   UnsignedByteType,
   Vector3,
   WebGLRenderer,
   sRGBEncoding,
+  Mesh,
+  PlaneBufferGeometry,
+  MeshBasicMaterial,
+  Group,
+  BackSide,
 } from 'three';
 import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -69,7 +80,7 @@ export class Viewer {
     this.state = {
       environment: options.preset === Preset.ASSET_GENERATOR
         ? environments.find((e) => e.id === 'footprint-court').name
-        : environments[1].name,
+        : environments[0].name,
       background: false,
       playbackSpeed: 1.0,
       actionStates: {},
@@ -80,7 +91,7 @@ export class Viewer {
 
       // Lights
       addLights: true,
-      exposure: 1.0,
+      toneMappingExposure: 1.0,
       textureEncoding: 'sRGB',
       ambientIntensity: 0.3,
       ambientColor: 0xFFFFFF,
@@ -399,8 +410,8 @@ export class Viewer {
     } else if (!state.addLights && lights.length) {
       this.removeLights();
     }
-
-    this.renderer.toneMappingExposure = state.exposure;
+    // debugger
+    this.renderer.toneMappingExposure = state.toneMappingExposure;
 
     if (lights.length === 2) {
       lights[0].intensity = state.ambientIntensity;
@@ -410,27 +421,52 @@ export class Viewer {
     }
   }
 
-  addLights () {
-    const state = this.state;
+  
 
-    if (this.options.preset === Preset.ASSET_GENERATOR) {
-      const hemiLight = new HemisphereLight();
-      hemiLight.name = 'hemi_light';
-      this.scene.add(hemiLight);
-      this.lights.push(hemiLight);
-      return;
+  addLights () {
+
+    let RectLight = (color, intensity, w, h) => {
+      let light = new RectAreaLight(color, intensity, w, h)
+      light.add(new Mesh(new PlaneBufferGeometry(w*.5, h*.5), new MeshBasicMaterial({color, side:BackSide})))
+      return light
     }
 
-    const light1  = new AmbientLight(state.ambientColor, state.ambientIntensity);
-    light1.name = 'ambient_light';
-    this.defaultCamera.add( light1 );
+    const state = this.state;
 
-    const light2  = new DirectionalLight(state.directColor, state.directIntensity);
-    light2.position.set(0.5, 0, 0.866); // ~60º
-    light2.name = 'main_light';
-    this.defaultCamera.add( light2 );
+    let top = RectLight(0xFFFFFF, 1, 10, 20)
+    top.rotation.x = Math.PI * -0.5
+    top.position.y = 3
+    SVGFEDropShadowElement;SVGDefsElement;;
+    let left = RectLight(0xFFFFFF, 1, 10, 5)
+    left.position.z = 10
 
-    this.lights.push(light1, light2);
+    let right = RectLight(0xFFFFFF, 1, 10, 5)
+    right.rotation.y = Math.PI
+    right.position.z = -10
+    // let right = new RectAreaLight()
+
+    this.scene.add(top)
+    this.scene.add(left)
+    this.scene.add(right)
+
+    // if (this.options.preset === Preset.ASSET_GENERATOR) {
+    //   const hemiLight = new HemisphereLight();
+    //   hemiLight.name = 'hemi_light';
+    //   this.scene.add(hemiLight);
+    //   this.lights.push(hemiLight);
+    //   return;
+    // }
+
+    // const light1  = new AmbientLight(state.ambientColor, state.ambientIntensity);
+    // light1.name = 'ambient_light';
+    // this.defaultCamera.add( light1 );
+
+    // const light2  = new DirectionalLight(state.directColor, state.directIntensity);
+    // light2.position.set(0.5, 0, 0.866); // ~60º
+    // light2.name = 'main_light';
+    // this.defaultCamera.add( light2 );
+
+    this.lights.push(top, left);
   }
 
   removeLights () {
@@ -581,10 +617,24 @@ export class Viewer {
           material.needsUpdate = true;
         });
       });
+    lightFolder.add(this.renderer, 'toneMapping', {none: NoToneMapping, Linear:LinearToneMapping, Reinhard:ReinhardToneMapping, Cineon:CineonToneMapping, Aces:ACESFilmicToneMapping})
+    .onChange(() => {
+      this.renderer.toneMapping = Number(this.renderer.toneMapping);
+      traverseMaterials(this.content, (material) => {
+        material.needsUpdate = true;
+      });
+    });
+    lightFolder.add(this.renderer, 'physicallyCorrectLights')
+    .onChange(() => {
+      this.renderer.toneMapping = Number(this.renderer.toneMapping);
+      traverseMaterials(this.content, (material) => {
+        material.needsUpdate = true;
+      });
+    });
     const envMapCtrl = lightFolder.add(this.state, 'environment', environments.map((env) => env.name));
     envMapCtrl.onChange(() => this.updateEnvironment());
     [
-      lightFolder.add(this.state, 'exposure', 0, 2),
+      lightFolder.add(this.state, 'toneMappingExposure', 0, 2),
       lightFolder.add(this.state, 'addLights').listen(),
       lightFolder.add(this.state, 'ambientIntensity', 0, 2),
       lightFolder.addColor(this.state, 'ambientColor'),

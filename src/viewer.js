@@ -33,7 +33,7 @@ import {
   BackSide,
   BoxBufferGeometry,
   MeshStandardMaterial,
-  VERSION
+  Vector2
 } from 'three';
 import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -44,10 +44,16 @@ import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLigh
 RectAreaLightUniformsLib.init()
 // import { RoughnessMipmapper } from 'three/examples/jsm/utils/RoughnessMipmapper.js';
 
+import { EffectComposer } from './EffectComposer2.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+// import { TAARenderPass  } from 'three/examples/jsm/postprocessing/TAARenderPass.js';
+// import { SMAAPass  } from 'three/examples/jsm/postprocessing/SMAAPass.js';
+import { UnrealBloomPass } from './/UnrealBloomPass.js';
+
 import { GUI } from 'dat.gui';
 
 import { environments } from '../assets/environment/index.js';
-import { createBackground } from '../lib/three-vignette.js';
+// import { createBackground } from '../lib/three-vignette.js';
 
 const DEFAULT_CAMERA = '[default]';
 
@@ -65,8 +71,6 @@ const MAP_NAMES = [
   'roughnessMap',
   'specularMap',
 ];
-
-console.log(VERSION)
 
 const Preset = {ASSET_GENERATOR: 'assetgenerator'};
 
@@ -138,13 +142,13 @@ export class Viewer {
     this.controls.autoRotateSpeed = -10;
     this.controls.screenSpacePanning = true;
 
-    this.vignette = createBackground({
-      aspect: this.defaultCamera.aspect,
-      grainScale: IS_IOS ? 0 : 0.001, // mattdesl/three-vignette-background#1
-      colors: [this.state.bgColor1, this.state.bgColor2]
-    });
-    this.vignette.name = 'Vignette';
-    this.vignette.renderOrder = -1;
+    // this.vignette = createBackground({
+    //   aspect: this.defaultCamera.aspect,
+    //   grainScale: IS_IOS ? 0 : 0.001, // mattdesl/three-vignette-background#1
+    //   colors: [this.state.bgColor1, this.state.bgColor2]
+    // });
+    // this.vignette.name = 'Vignette';
+    // this.vignette.renderOrder = -1;
 
     this.el.appendChild(this.renderer.domElement);
 
@@ -161,6 +165,7 @@ export class Viewer {
     this.addAxesHelper();
     this.addGUI();
     this.addLights()
+    this.addPost()
     if (options.kiosk) this.gui.close();
 
     this.animate = this.animate.bind(this);
@@ -185,7 +190,9 @@ export class Viewer {
 
   render () {
 
-    this.renderer.render( this.scene, this.activeCamera );
+    // this.renderer.render( this.scene, this.activeCamera );
+    this.renderPass.camera = this.activeCamera
+    this.composer.render();
     if (this.state.grid) {
       this.axesCamera.position.copy(this.defaultCamera.position)
       this.axesCamera.lookAt(this.axesScene.position)
@@ -195,12 +202,17 @@ export class Viewer {
 
   resize () {
 
-    const {clientHeight, clientWidth} = this.el.parentElement;
+    let [w, h] = [window.innerWidth, window.innerHeight]
 
-    this.defaultCamera.aspect = clientWidth / clientHeight;
-    this.defaultCamera.updateProjectionMatrix();
-    this.vignette.style({aspect: this.defaultCamera.aspect});
-    this.renderer.setSize(clientWidth, clientHeight);
+    // clientWidth *= this.renderer.getPixelRatio()
+    // clientHeight *= this.renderer.getPixelRatio()
+
+    this.activeCamera.aspect = w / h;
+    this.activeCamera.updateProjectionMatrix();
+    // this.vignette.style({aspect: this.defaultCamera.aspect});
+    this.renderer.setSize(w, h);
+    this.composer.setSize(w, h);
+    // this.unrealPass.setSize(clientWidth, clientHeight);
 
     this.axesCamera.aspect = this.axesDiv.clientWidth / this.axesDiv.clientHeight;
     this.axesCamera.updateProjectionMatrix();
@@ -311,6 +323,8 @@ export class Viewer {
 
     }
 
+    traverseMaterials(object, material => material.dithering = true)
+
     this.setCamera(DEFAULT_CAMERA);
 
     this.axesCamera.position.copy(this.defaultCamera.position)
@@ -324,6 +338,8 @@ export class Viewer {
 
     this.scene.add(object);
     this.content = object;
+
+    
 
     // this.state.addLights = true;
 
@@ -397,6 +413,8 @@ export class Viewer {
           this.activeCamera = node;
         }
       });
+      this.activeCamera.far = 100
+      this.resize()
     }
   }
 
@@ -431,7 +449,30 @@ export class Viewer {
     // }
   }
 
-  
+  addPost(){
+
+    this.composer = new EffectComposer( this.renderer );
+
+    this.renderPass = new RenderPass (this.scene, this.defaultCamera)
+    this.composer.addPass( this.renderPass );
+
+    // this.smaaPass = new SMAAPass (window.innerWidth * this.renderer.getPixelRatio(), window.innerHeight * this.renderer.getPixelRatio() )
+    // this.composer.addPass( this.smaaPass );
+
+    // this.renderPass.sampleLevel = 4
+    // this.renderPass.accumulate = true
+
+    this.unrealPass = new UnrealBloomPass(this.renderer, new Vector2( window.innerWidth, window.innerHeight ), 0.5, 0.4, 0.9)
+    this.composer.addPass( this.unrealPass );
+    this.unrealPass.st
+    const postUI = this.gui.addFolder('Post Processing')
+    postUI.add(this.unrealPass, 'strength', 0, 5)
+    postUI.add(this.unrealPass, 'radius', 0, 5)
+    postUI.add(this.unrealPass, 'threshold', 0, 1)
+
+    this.resize()
+
+  }
 
   addLights () {
 
@@ -502,11 +543,11 @@ export class Viewer {
 
     this.getCubeMapTexture( environment ).then(( { envMap } ) => {
 
-      if ((!envMap || !this.state.background) && this.activeCamera === this.defaultCamera) {
-        this.scene.add(this.vignette);
-      } else {
-        this.scene.remove(this.vignette);
-      }
+      // if ((!envMap || !this.state.background) && this.activeCamera === this.defaultCamera) {
+      //   this.scene.add(this.vignette);
+      // } else {
+      //   this.scene.remove(this.vignette);
+      // }
 
       this.scene.environment = envMap;
       this.scene.background = this.state.background ? envMap : null;
@@ -580,7 +621,7 @@ export class Viewer {
   }
 
   updateBackground () {
-    this.vignette.style({colors: [this.state.bgColor1, this.state.bgColor2]});
+    // this.vignette.style({colors: [this.state.bgColor1, this.state.bgColor2]});
   }
 
   /**
@@ -599,7 +640,7 @@ export class Viewer {
     this.axesCamera = new PerspectiveCamera( 50, clientWidth / clientHeight, 0.1, 10 );
     this.axesScene.add( this.axesCamera );
 
-    this.axesRenderer = new WebGLRenderer( { alpha: true } );
+    this.axesRenderer = new WebGLRenderer( { powerPreference: "high-performance", antialias: true } );
     this.axesRenderer.setPixelRatio( window.devicePixelRatio );
     this.axesRenderer.setSize( this.axesDiv.clientWidth, this.axesDiv.clientHeight );
 

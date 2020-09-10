@@ -4,7 +4,7 @@ const path = require('path');
 const open = require('open');
 const serve = require('electron-serve');
 
-const loadURL = serve({directory: 'dist'});
+const loadURL = serve({directory: 'docs'});
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.

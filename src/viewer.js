@@ -534,8 +534,8 @@ export class Viewer {
     }
 
     traverseMaterials(this.content, (material) => {
-      material.roughness = 0.0;
-      material.metalness = 1.0;
+      // material.roughness = 0.0;
+      // material.metalness = 1.0;
       material.wireframe = this.state.wireframe;
     });
     window.boxx.material.wireframe = this.state.wireframe;

@@ -44753,8 +44753,8 @@ function () {
       }
 
       traverseMaterials(this.content, function (material) {
-        material.roughness = 0.0;
-        material.metalness = 1.0;
+        // material.roughness = 0.0;
+        // material.metalness = 1.0;
         material.wireframe = _this8.state.wireframe;
       });
       window.boxx.material.wireframe = this.state.wireframe;
@@ -68022,7 +68022,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "61425" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "62048" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

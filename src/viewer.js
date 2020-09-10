@@ -97,13 +97,13 @@ export class Viewer {
       grid: false,
 
       // Lights
-      addLights: true,
+      // addLights: true,
       toneMappingExposure: 1.0,
       textureEncoding: 'sRGB',
-      ambientIntensity: 0.3,
-      ambientColor: 0xFFFFFF,
-      directIntensity: 0.8 * Math.PI, // TODO(#116)
-      directColor: 0xFFFFFF,
+      // ambientIntensity: 0.3,
+      // ambientColor: 0xFFFFFF,
+      // directIntensity: 0.8 * Math.PI, // TODO(#116)
+      // directColor: 0xFFFFFF,
       bgColor1: '#ffffff',
       bgColor2: '#353535'
     };
@@ -160,6 +160,7 @@ export class Viewer {
 
     this.addAxesHelper();
     this.addGUI();
+    this.addLights()
     if (options.kiosk) this.gui.close();
 
     this.animate = this.animate.bind(this);
@@ -324,16 +325,18 @@ export class Viewer {
     this.scene.add(object);
     this.content = object;
 
-    this.state.addLights = true;
+    // this.state.addLights = true;
 
-    this.content.traverse((node) => {
-      if (node.isLight) {
-        this.state.addLights = false;
-      } else if (node.isMesh) {
-        // TODO(https://github.com/mrdoob/three.js/pull/18235): Clean up.
-        node.material.depthWrite = !node.material.transparent;
-      }
-    });
+    // this.content.traverse((node) => {
+    //   if (node.isLight) {
+    //     this.state.addLights = false;
+    //   } else if (node.isMesh) {
+    //     // TODO(https://github.com/mrdoob/three.js/pull/18235): Clean up.
+    //     node.material.depthWrite = !node.material.transparent;
+    //   }
+    // });
+
+    
 
     this.setClips(clips);
 
@@ -412,20 +415,20 @@ export class Viewer {
     const state = this.state;
     const lights = this.lights;
 
-    if (state.addLights && !lights.length) {
-      this.addLights();
-    } else if (!state.addLights && lights.length) {
-      this.removeLights();
-    }
+    // if (state.addLights && !lights.length) {
+    //   this.addLights();
+    // } else if (!state.addLights && lights.length) {
+    //   this.removeLights();
+    // }
     // debugger
     this.renderer.toneMappingExposure = state.toneMappingExposure;
 
-    if (lights.length === 2) {
-      lights[0].intensity = state.ambientIntensity;
-      lights[0].color.setHex(state.ambientColor);
-      lights[1].intensity = state.directIntensity;
-      lights[1].color.setHex(state.directColor);
-    }
+    // if (lights.length === 2) {
+    //   lights[0].intensity = state.ambientIntensity;
+    //   lights[0].color.setHex(state.ambientColor);
+    //   lights[1].intensity = state.directIntensity;
+    //   lights[1].color.setHex(state.directColor);
+    // }
   }
 
   
@@ -456,6 +459,16 @@ export class Viewer {
     this.scene.add(left)
     this.scene.add(right)
 
+    // debugger
+    window.lightFolder.addFolder('light top')
+      .add(top, 'intensity', 0, 5)
+
+    window.lightFolder.addFolder('light left')
+      .add(left, 'intensity', 0, 5)
+
+    window.lightFolder.addFolder('light right')
+      .add(right, 'intensity', 0, 5)
+
     // if (this.options.preset === Preset.ASSET_GENERATOR) {
     //   const hemiLight = new HemisphereLight();
     //   hemiLight.name = 'hemi_light';
@@ -463,9 +476,6 @@ export class Viewer {
     //   this.lights.push(hemiLight);
     //   return;
     // }
-
-    window.boxx =  new Mesh(new BoxBufferGeometry(1, 1, 1, 10, 10, 10), new MeshStandardMaterial({roughness:0, metalness:1}))
-    this.scene.add( window.boxx)
 
     // const light1  = new AmbientLight(state.ambientColor, state.ambientIntensity);
     // light1.name = 'ambient_light';
@@ -476,15 +486,15 @@ export class Viewer {
     // light2.name = 'main_light';
     // this.defaultCamera.add( light2 );
 
-    this.lights.push(top, left);
+    // this.lights.push(top, left);
   }
 
-  removeLights () {
+  // removeLights () {
 
-    this.lights.forEach((light) => light.parent.remove(light));
-    this.lights.length = 0;
+  //   this.lights.forEach((light) => light.parent.remove(light));
+  //   this.lights.length = 0;
 
-  }
+  // }
 
   updateEnvironment () {
 
@@ -534,11 +544,8 @@ export class Viewer {
     }
 
     traverseMaterials(this.content, (material) => {
-      // material.roughness = 0.0;
-      // material.metalness = 1.0;
       material.wireframe = this.state.wireframe;
     });
-    window.boxx.material.wireframe = this.state.wireframe;
   
 
     this.content.traverse((node) => {
@@ -625,7 +632,7 @@ export class Viewer {
     bgColor2Ctrl.onChange(() => this.updateBackground());
 
     // Lighting controls.
-    const lightFolder = gui.addFolder('Lighting');
+    window.lightFolder = gui.addFolder('Lighting');
     const encodingCtrl = lightFolder.add(this.state, 'textureEncoding', ['sRGB', 'Linear']);
     encodingCtrl.onChange(() => this.updateTextureEncoding());
     lightFolder.add(this.renderer, 'outputEncoding', {sRGB: sRGBEncoding, Linear: LinearEncoding})
@@ -653,11 +660,11 @@ export class Viewer {
     envMapCtrl.onChange(() => this.updateEnvironment());
     [
       lightFolder.add(this.state, 'toneMappingExposure', 0, 2),
-      lightFolder.add(this.state, 'addLights').listen(),
-      lightFolder.add(this.state, 'ambientIntensity', 0, 2),
-      lightFolder.addColor(this.state, 'ambientColor'),
-      lightFolder.add(this.state, 'directIntensity', 0, 4), // TODO(#116)
-      lightFolder.addColor(this.state, 'directColor')
+      // lightFolder.add(this.state, 'addLights').listen(),
+      // lightFolder.add(this.state, 'ambientIntensity', 0, 2),
+      // lightFolder.addColor(this.state, 'ambientColor'),
+      // lightFolder.add(this.state, 'directIntensity', 0, 4), // TODO(#116)
+      // lightFolder.addColor(this.state, 'directColor')
     ].forEach((ctrl) => ctrl.onChange(() => this.updateLights()));
 
     // Animation controls.

@@ -44338,14 +44338,13 @@ function () {
       skeleton: false,
       grid: false,
       // Lights
-      addLights: true,
+      // addLights: true,
       toneMappingExposure: 1.0,
       textureEncoding: 'sRGB',
-      ambientIntensity: 0.3,
-      ambientColor: 0xFFFFFF,
-      directIntensity: 0.8 * Math.PI,
-      // TODO(#116)
-      directColor: 0xFFFFFF,
+      // ambientIntensity: 0.3,
+      // ambientColor: 0xFFFFFF,
+      // directIntensity: 0.8 * Math.PI, // TODO(#116)
+      // directColor: 0xFFFFFF,
       bgColor1: '#ffffff',
       bgColor2: '#353535'
     };
@@ -44394,6 +44393,7 @@ function () {
     this.axesHelper = null;
     this.addAxesHelper();
     this.addGUI();
+    this.addLights();
     if (options.kiosk) this.gui.close();
     this.animate = this.animate.bind(this);
     requestAnimationFrame(this.animate);
@@ -44496,8 +44496,6 @@ function () {
   }, {
     key: "setContent",
     value: function setContent(object, clips) {
-      var _this2 = this;
-
       this.clear();
       var box = new _three.Box3().setFromObject(object);
       var size = box.getSize(new _three.Vector3()).length();
@@ -44531,16 +44529,16 @@ function () {
       this.axesCorner.scale.set(size, size, size);
       this.controls.saveState();
       this.scene.add(object);
-      this.content = object;
-      this.state.addLights = true;
-      this.content.traverse(function (node) {
-        if (node.isLight) {
-          _this2.state.addLights = false;
-        } else if (node.isMesh) {
-          // TODO(https://github.com/mrdoob/three.js/pull/18235): Clean up.
-          node.material.depthWrite = !node.material.transparent;
-        }
-      });
+      this.content = object; // this.state.addLights = true;
+      // this.content.traverse((node) => {
+      //   if (node.isLight) {
+      //     this.state.addLights = false;
+      //   } else if (node.isMesh) {
+      //     // TODO(https://github.com/mrdoob/three.js/pull/18235): Clean up.
+      //     node.material.depthWrite = !node.material.transparent;
+      //   }
+      // });
+
       this.setClips(clips);
       this.updateLights();
       this.updateGUI();
@@ -44554,11 +44552,11 @@ function () {
   }, {
     key: "printGraph",
     value: function printGraph(node) {
-      var _this3 = this;
+      var _this2 = this;
 
       console.group(' <' + node.type + '> ' + node.name);
       node.children.forEach(function (child) {
-        return _this3.printGraph(child);
+        return _this2.printGraph(child);
       });
       console.groupEnd();
     }
@@ -44582,12 +44580,12 @@ function () {
   }, {
     key: "playAllClips",
     value: function playAllClips() {
-      var _this4 = this;
+      var _this3 = this;
 
       this.clips.forEach(function (clip) {
-        _this4.mixer.clipAction(clip).reset().play();
+        _this3.mixer.clipAction(clip).reset().play();
 
-        _this4.state.actionStates[clip.name] = true;
+        _this3.state.actionStates[clip.name] = true;
       });
     }
     /**
@@ -44597,7 +44595,7 @@ function () {
   }, {
     key: "setCamera",
     value: function setCamera(name) {
-      var _this5 = this;
+      var _this4 = this;
 
       if (name === DEFAULT_CAMERA) {
         this.controls.enabled = true;
@@ -44606,7 +44604,7 @@ function () {
         this.controls.enabled = false;
         this.content.traverse(function (node) {
           if (node.isCamera && node.name === name) {
-            _this5.activeCamera = node;
+            _this4.activeCamera = node;
           }
         });
       }
@@ -44625,23 +44623,19 @@ function () {
     key: "updateLights",
     value: function updateLights() {
       var state = this.state;
-      var lights = this.lights;
+      var lights = this.lights; // if (state.addLights && !lights.length) {
+      //   this.addLights();
+      // } else if (!state.addLights && lights.length) {
+      //   this.removeLights();
+      // }
+      // debugger
 
-      if (state.addLights && !lights.length) {
-        this.addLights();
-      } else if (!state.addLights && lights.length) {
-        this.removeLights();
-      } // debugger
-
-
-      this.renderer.toneMappingExposure = state.toneMappingExposure;
-
-      if (lights.length === 2) {
-        lights[0].intensity = state.ambientIntensity;
-        lights[0].color.setHex(state.ambientColor);
-        lights[1].intensity = state.directIntensity;
-        lights[1].color.setHex(state.directColor);
-      }
+      this.renderer.toneMappingExposure = state.toneMappingExposure; // if (lights.length === 2) {
+      //   lights[0].intensity = state.ambientIntensity;
+      //   lights[0].color.setHex(state.ambientColor);
+      //   lights[1].intensity = state.directIntensity;
+      //   lights[1].color.setHex(state.directColor);
+      // }
     }
   }, {
     key: "addLights",
@@ -44667,62 +44661,56 @@ function () {
 
       this.scene.add(top);
       this.scene.add(left);
-      this.scene.add(right); // if (this.options.preset === Preset.ASSET_GENERATOR) {
+      this.scene.add(right); // debugger
+
+      window.lightFolder.addFolder('light top').add(top, 'intensity', 0, 5);
+      window.lightFolder.addFolder('light left').add(left, 'intensity', 0, 5);
+      window.lightFolder.addFolder('light right').add(right, 'intensity', 0, 5); // if (this.options.preset === Preset.ASSET_GENERATOR) {
       //   const hemiLight = new HemisphereLight();
       //   hemiLight.name = 'hemi_light';
       //   this.scene.add(hemiLight);
       //   this.lights.push(hemiLight);
       //   return;
       // }
-
-      window.boxx = new _three.Mesh(new _three.BoxBufferGeometry(1, 1, 1, 10, 10, 10), new _three.MeshStandardMaterial({
-        roughness: 0,
-        metalness: 1
-      }));
-      this.scene.add(window.boxx); // const light1  = new AmbientLight(state.ambientColor, state.ambientIntensity);
+      // const light1  = new AmbientLight(state.ambientColor, state.ambientIntensity);
       // light1.name = 'ambient_light';
       // this.defaultCamera.add( light1 );
       // const light2  = new DirectionalLight(state.directColor, state.directIntensity);
       // light2.position.set(0.5, 0, 0.866); // ~60º
       // light2.name = 'main_light';
       // this.defaultCamera.add( light2 );
+      // this.lights.push(top, left);
+    } // removeLights () {
+    //   this.lights.forEach((light) => light.parent.remove(light));
+    //   this.lights.length = 0;
+    // }
 
-      this.lights.push(top, left);
-    }
-  }, {
-    key: "removeLights",
-    value: function removeLights() {
-      this.lights.forEach(function (light) {
-        return light.parent.remove(light);
-      });
-      this.lights.length = 0;
-    }
   }, {
     key: "updateEnvironment",
     value: function updateEnvironment() {
-      var _this6 = this;
+      var _this5 = this;
 
       var environment = _index.environments.filter(function (entry) {
-        return entry.name === _this6.state.environment;
+        return entry.name === _this5.state.environment;
       })[0];
 
       this.getCubeMapTexture(environment).then(function (_ref) {
         var envMap = _ref.envMap;
 
-        if ((!envMap || !_this6.state.background) && _this6.activeCamera === _this6.defaultCamera) {
-          _this6.scene.add(_this6.vignette);
+        if ((!envMap || !_this5.state.background) && _this5.activeCamera === _this5.defaultCamera) {
+          _this5.scene.add(_this5.vignette);
         } else {
-          _this6.scene.remove(_this6.vignette);
+          _this5.scene.remove(_this5.vignette);
         }
 
-        _this6.scene.environment = envMap;
-        _this6.scene.background = _this6.state.background ? envMap : null;
+        _this5.scene.environment = envMap;
+        _this5.scene.background = _this5.state.background ? envMap : null;
       });
     }
   }, {
     key: "getCubeMapTexture",
     value: function getCubeMapTexture(environment) {
-      var _this7 = this;
+      var _this6 = this;
 
       var path = environment.path; // no envmap
 
@@ -44731,9 +44719,9 @@ function () {
       });
       return new Promise(function (resolve, reject) {
         new _RGBELoader.RGBELoader().setDataType(_three.UnsignedByteType).load(path, function (texture) {
-          var envMap = _this7.pmremGenerator.fromEquirectangular(texture).texture;
+          var envMap = _this6.pmremGenerator.fromEquirectangular(texture).texture;
 
-          _this7.pmremGenerator.dispose();
+          _this6.pmremGenerator.dispose();
 
           resolve({
             envMap: envMap
@@ -44744,32 +44732,29 @@ function () {
   }, {
     key: "updateDisplay",
     value: function updateDisplay() {
-      var _this8 = this;
+      var _this7 = this;
 
       if (this.skeletonHelpers.length) {
         this.skeletonHelpers.forEach(function (helper) {
-          return _this8.scene.remove(helper);
+          return _this7.scene.remove(helper);
         });
       }
 
       traverseMaterials(this.content, function (material) {
-        // material.roughness = 0.0;
-        // material.metalness = 1.0;
-        material.wireframe = _this8.state.wireframe;
+        material.wireframe = _this7.state.wireframe;
       });
-      window.boxx.material.wireframe = this.state.wireframe;
       this.content.traverse(function (node) {
         if (node.isMesh && node.material && node.material.map) {
           console.log(node.material);
         }
 
-        if (node.isMesh && node.skeleton && _this8.state.skeleton) {
+        if (node.isMesh && node.skeleton && _this7.state.skeleton) {
           var helper = new _three.SkeletonHelper(node.skeleton.bones[0].parent);
           helper.material.linewidth = 3;
 
-          _this8.scene.add(helper);
+          _this7.scene.add(helper);
 
-          _this8.skeletonHelpers.push(helper);
+          _this7.skeletonHelpers.push(helper);
         }
       });
 
@@ -44832,7 +44817,7 @@ function () {
   }, {
     key: "addGUI",
     value: function addGUI() {
-      var _this9 = this;
+      var _this8 = this;
 
       var gui = this.gui = new _dat.GUI({
         autoPlace: false,
@@ -44843,42 +44828,42 @@ function () {
       var dispFolder = gui.addFolder('Display');
       var envBackgroundCtrl = dispFolder.add(this.state, 'background');
       envBackgroundCtrl.onChange(function () {
-        return _this9.updateEnvironment();
+        return _this8.updateEnvironment();
       });
       var wireframeCtrl = dispFolder.add(this.state, 'wireframe');
       wireframeCtrl.onChange(function () {
-        return _this9.updateDisplay();
+        return _this8.updateDisplay();
       });
       var skeletonCtrl = dispFolder.add(this.state, 'skeleton');
       skeletonCtrl.onChange(function () {
-        return _this9.updateDisplay();
+        return _this8.updateDisplay();
       });
       var gridCtrl = dispFolder.add(this.state, 'grid');
       gridCtrl.onChange(function () {
-        return _this9.updateDisplay();
+        return _this8.updateDisplay();
       });
       dispFolder.add(this.controls, 'autoRotate');
       dispFolder.add(this.controls, 'screenSpacePanning');
       var bgColor1Ctrl = dispFolder.addColor(this.state, 'bgColor1');
       var bgColor2Ctrl = dispFolder.addColor(this.state, 'bgColor2');
       bgColor1Ctrl.onChange(function () {
-        return _this9.updateBackground();
+        return _this8.updateBackground();
       });
       bgColor2Ctrl.onChange(function () {
-        return _this9.updateBackground();
+        return _this8.updateBackground();
       }); // Lighting controls.
 
-      var lightFolder = gui.addFolder('Lighting');
+      window.lightFolder = gui.addFolder('Lighting');
       var encodingCtrl = lightFolder.add(this.state, 'textureEncoding', ['sRGB', 'Linear']);
       encodingCtrl.onChange(function () {
-        return _this9.updateTextureEncoding();
+        return _this8.updateTextureEncoding();
       });
       lightFolder.add(this.renderer, 'outputEncoding', {
         sRGB: _three.sRGBEncoding,
         Linear: _three.LinearEncoding
       }).onChange(function () {
-        _this9.renderer.outputEncoding = Number(_this9.renderer.outputEncoding);
-        traverseMaterials(_this9.content, function (material) {
+        _this8.renderer.outputEncoding = Number(_this8.renderer.outputEncoding);
+        traverseMaterials(_this8.content, function (material) {
           material.needsUpdate = true;
         });
       });
@@ -44889,14 +44874,14 @@ function () {
         Cineon: _three.CineonToneMapping,
         Aces: _three.ACESFilmicToneMapping
       }).onChange(function () {
-        _this9.renderer.toneMapping = Number(_this9.renderer.toneMapping);
-        traverseMaterials(_this9.content, function (material) {
+        _this8.renderer.toneMapping = Number(_this8.renderer.toneMapping);
+        traverseMaterials(_this8.content, function (material) {
           material.needsUpdate = true;
         });
       });
       lightFolder.add(this.renderer, 'physicallyCorrectLights').onChange(function () {
-        _this9.renderer.toneMapping = Number(_this9.renderer.toneMapping);
-        traverseMaterials(_this9.content, function (material) {
+        _this8.renderer.toneMapping = Number(_this8.renderer.toneMapping);
+        traverseMaterials(_this8.content, function (material) {
           material.needsUpdate = true;
         });
       });
@@ -44904,12 +44889,16 @@ function () {
         return env.name;
       }));
       envMapCtrl.onChange(function () {
-        return _this9.updateEnvironment();
+        return _this8.updateEnvironment();
       });
-      [lightFolder.add(this.state, 'toneMappingExposure', 0, 2), lightFolder.add(this.state, 'addLights').listen(), lightFolder.add(this.state, 'ambientIntensity', 0, 2), lightFolder.addColor(this.state, 'ambientColor'), lightFolder.add(this.state, 'directIntensity', 0, 4), // TODO(#116)
-      lightFolder.addColor(this.state, 'directColor')].forEach(function (ctrl) {
+      [lightFolder.add(this.state, 'toneMappingExposure', 0, 2) // lightFolder.add(this.state, 'addLights').listen(),
+      // lightFolder.add(this.state, 'ambientIntensity', 0, 2),
+      // lightFolder.addColor(this.state, 'ambientColor'),
+      // lightFolder.add(this.state, 'directIntensity', 0, 4), // TODO(#116)
+      // lightFolder.addColor(this.state, 'directColor')
+      ].forEach(function (ctrl) {
         return ctrl.onChange(function () {
-          return _this9.updateLights();
+          return _this8.updateLights();
         });
       }); // Animation controls.
 
@@ -44917,11 +44906,11 @@ function () {
       this.animFolder.domElement.style.display = 'none';
       var playbackSpeedCtrl = this.animFolder.add(this.state, 'playbackSpeed', 0, 1);
       playbackSpeedCtrl.onChange(function (speed) {
-        if (_this9.mixer) _this9.mixer.timeScale = speed;
+        if (_this8.mixer) _this8.mixer.timeScale = speed;
       });
       this.animFolder.add({
         playAll: function playAll() {
-          return _this9.playAllClips();
+          return _this8.playAllClips();
         }
       }, 'playAll'); // Morph target controls.
 
@@ -44948,7 +44937,7 @@ function () {
   }, {
     key: "updateGUI",
     value: function updateGUI() {
-      var _this10 = this;
+      var _this9 = this;
 
       this.cameraFolder.domElement.style.display = 'none';
       this.morphCtrls.forEach(function (ctrl) {
@@ -44980,7 +44969,7 @@ function () {
         var cameraOptions = [DEFAULT_CAMERA].concat(cameraNames);
         this.cameraCtrl = this.cameraFolder.add(this.state, 'camera', cameraOptions);
         this.cameraCtrl.onChange(function (name) {
-          return _this10.setCamera(name);
+          return _this9.setCamera(name);
         });
       }
 
@@ -44988,21 +44977,21 @@ function () {
         this.morphFolder.domElement.style.display = '';
         morphMeshes.forEach(function (mesh) {
           if (mesh.morphTargetInfluences.length) {
-            var nameCtrl = _this10.morphFolder.add({
+            var nameCtrl = _this9.morphFolder.add({
               name: mesh.name || 'Untitled'
             }, 'name');
 
-            _this10.morphCtrls.push(nameCtrl);
+            _this9.morphCtrls.push(nameCtrl);
           }
 
           var _loop = function _loop(i) {
-            var ctrl = _this10.morphFolder.add(mesh.morphTargetInfluences, i, 0, 1, 0.01).listen();
+            var ctrl = _this9.morphFolder.add(mesh.morphTargetInfluences, i, 0, 1, 0.01).listen();
 
             Object.keys(mesh.morphTargetDictionary).forEach(function (key) {
               if (key && mesh.morphTargetDictionary[key] === i) ctrl.name(key);
             });
 
-            _this10.morphCtrls.push(ctrl);
+            _this9.morphCtrls.push(ctrl);
           };
 
           for (var i = 0; i < mesh.morphTargetInfluences.length; i++) {
@@ -45020,22 +45009,22 @@ function () {
 
           if (clipIndex === 0) {
             actionStates[clip.name] = true;
-            action = _this10.mixer.clipAction(clip);
+            action = _this9.mixer.clipAction(clip);
             action.play();
           } else {
             actionStates[clip.name] = false;
           } // Play other clips when enabled.
 
 
-          var ctrl = _this10.animFolder.add(actionStates, clip.name).listen();
+          var ctrl = _this9.animFolder.add(actionStates, clip.name).listen();
 
           ctrl.onChange(function (playAnimation) {
-            action = action || _this10.mixer.clipAction(clip);
+            action = action || _this9.mixer.clipAction(clip);
             action.setEffectiveTimeScale(1);
             playAnimation ? action.play() : action.stop();
           });
 
-          _this10.animCtrls.push(ctrl);
+          _this9.animCtrls.push(ctrl);
         });
       }
     }

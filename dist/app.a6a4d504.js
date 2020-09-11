@@ -41689,7 +41689,123 @@ RenderPass.prototype = Object.assign(Object.create(_Pass.Pass.prototype), {
     renderer.autoClear = oldAutoClear;
   }
 });
-},{"../postprocessing/Pass.js":"node_modules/three/examples/jsm/postprocessing/Pass.js"}],"node_modules/three/examples/jsm/shaders/LuminosityHighPassShader.js":[function(require,module,exports) {
+},{"../postprocessing/Pass.js":"node_modules/three/examples/jsm/postprocessing/Pass.js"}],"src/FilmShader.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.FilmShader = void 0;
+
+/**
+ * Film grain & scanlines shader
+ *
+ * - ported from HLSL to WebGL / GLSL
+ * http://www.truevision3d.com/forums/showcase/staticnoise_colorblackwhite_scanline_shaders-t18698.0.html
+ *
+ * Screen Space Static Postprocessor
+ *
+ * Produces an analogue noise overlay similar to a film grain / TV static
+ *
+ * Original implementation and noise algorithm
+ * Pat 'Hawthorne' Shearon
+ *
+ * Optimized scanlines + noise version with intensity scaling
+ * Georg 'Leviathan' Steinrohder
+ *
+ * This version is provided under a Creative Commons Attribution 3.0 License
+ * http://creativecommons.org/licenses/by/3.0/
+ */
+var FilmShader = {
+  uniforms: {
+    "tDiffuse": {
+      value: null
+    },
+    "time": {
+      value: 0.0
+    },
+    "nIntensity": {
+      value: 0.5
+    },
+    "sIntensity": {
+      value: 0.05
+    },
+    "sCount": {
+      value: 4096
+    },
+    "grayscale": {
+      value: 1
+    }
+  },
+  vertexShader: ["varying vec2 vUv;", "void main() {", "	vUv = uv;", "	gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );", "}"].join("\n"),
+  fragmentShader: ["#include <common>", // control parameter
+  "uniform float time;", "uniform bool grayscale;", // noise effect intensity value (0 = no effect, 1 = full effect)
+  "uniform float nIntensity;", // scanlines effect intensity value (0 = no effect, 1 = full effect)
+  "uniform float sIntensity;", // scanlines effect count value (0 = no effect, 4096 = full effect)
+  "uniform float sCount;", "uniform sampler2D tDiffuse;", "varying vec2 vUv;", "void main() {", // sample the source
+  "	vec4 cTextureScreen = pow(texture2D( tDiffuse, vUv ), vec4(1.0/2.));", // make some noise
+  "	float dx = rand( vUv + (time*0.01) );", // add noise
+  "	vec3 cResult = cTextureScreen.rgb + cTextureScreen.rgb * clamp( 0.1 + dx, 0.0, 1.0 );", // get us a sine and cosine
+  // "	vec2 sc = vec2( sin( vUv.y * sCount ), cos( vUv.y * sCount ) );",
+  // add scanlines
+  // "	cResult += cTextureScreen.rgb * vec3( sc.x, sc.y, sc.x ) * sIntensity;",
+  // interpolate between source and result by intensity
+  "	cResult = cTextureScreen.rgb + clamp( nIntensity, 0.0,1.0 ) * ( cResult - cTextureScreen.rgb );", // convert to grayscale if desired
+  "	if( grayscale ) {", "		cResult = vec3( cResult.r * 0.3 + cResult.g * 0.59 + cResult.b * 0.11 );", "	}", "	gl_FragColor =  vec4( cResult, cTextureScreen.a );", "}"].join("\n")
+};
+exports.FilmShader = FilmShader;
+},{}],"src/FilmPass.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.FilmPass = void 0;
+
+var _three = require("three");
+
+var _Pass = require("three/examples/jsm/postprocessing/Pass.js");
+
+var _FilmShader = require("./FilmShader.js");
+
+var FilmPass = function FilmPass(noiseIntensity, scanlinesIntensity, scanlinesCount, grayscale) {
+  _Pass.Pass.call(this);
+
+  if (_FilmShader.FilmShader === undefined) console.error("FilmPass relies on FilmShader");
+  var shader = _FilmShader.FilmShader;
+  this.uniforms = _three.UniformsUtils.clone(shader.uniforms);
+  this.material = new _three.ShaderMaterial({
+    uniforms: this.uniforms,
+    vertexShader: shader.vertexShader,
+    fragmentShader: shader.fragmentShader
+  });
+  if (grayscale !== undefined) this.uniforms.grayscale.value = grayscale;
+  if (noiseIntensity !== undefined) this.uniforms.nIntensity.value = noiseIntensity;
+  if (scanlinesIntensity !== undefined) this.uniforms.sIntensity.value = scanlinesIntensity;
+  if (scanlinesCount !== undefined) this.uniforms.sCount.value = scanlinesCount;
+  this.fsQuad = new _Pass.Pass.FullScreenQuad(this.material);
+};
+
+exports.FilmPass = FilmPass;
+FilmPass.prototype = Object.assign(Object.create(_Pass.Pass.prototype), {
+  constructor: FilmPass,
+  render: function render(renderer, writeBuffer, readBuffer, deltaTime
+  /*, maskActive */
+  ) {
+    this.uniforms["tDiffuse"].value = readBuffer.texture;
+    this.uniforms["time"].value += deltaTime;
+
+    if (this.renderToScreen) {
+      renderer.setRenderTarget(null);
+      this.fsQuad.render(renderer);
+    } else {
+      renderer.setRenderTarget(writeBuffer);
+      if (this.clear) renderer.clear();
+      this.fsQuad.render(renderer);
+    }
+  }
+});
+},{"three":"node_modules/three/build/three.module.js","three/examples/jsm/postprocessing/Pass.js":"node_modules/three/examples/jsm/postprocessing/Pass.js","./FilmShader.js":"src/FilmShader.js"}],"node_modules/three/examples/jsm/shaders/LuminosityHighPassShader.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -45017,6 +45133,8 @@ var _EffectComposer = require("./EffectComposer2.js");
 
 var _RenderPass = require("three/examples/jsm/postprocessing/RenderPass.js");
 
+var _FilmPass = require("./FilmPass.js");
+
 var _UnrealBloomPass = require(".//UnrealBloomPass.js");
 
 var _dat = require("dat.gui");
@@ -45049,6 +45167,8 @@ var Viewer =
 /*#__PURE__*/
 function () {
   function Viewer(el, options) {
+    var _this = this;
+
     _classCallCheck(this, Viewer);
 
     this.el = el;
@@ -45080,6 +45200,11 @@ function () {
       bgColor1: '#ffffff',
       bgColor2: '#353535'
     };
+    this.mouse = new _three.Vector2();
+    window.addEventListener('mousemove', function (e) {
+      _this.mouse.x = (e.clientX - window.innerWidth * 0.5) * 0.001;
+      _this.mouse.y = (e.clientY - window.innerHeight * 0.5) * 0.001;
+    });
     this.prevTime = 0;
     this.stats = new _statsModule.default();
     this.stats.dom.height = '48px';
@@ -45096,6 +45221,8 @@ function () {
     });
     this.renderer.physicallyCorrectLights = true;
     this.renderer.outputEncoding = _three.sRGBEncoding;
+    this.renderer.shadowMapType = _three.VSMShadowMap;
+    this.renderer.shadowMap.enabled = true;
     this.renderer.setClearColor(0xcccccc);
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(el.clientWidth, el.clientHeight);
@@ -45137,6 +45264,18 @@ function () {
     value: function animate(time) {
       requestAnimationFrame(this.animate);
       var dt = (time - this.prevTime) / 1000;
+
+      if (!this.controls.enabled) {
+        // console.log(this.mouse.x)
+        var t = this.scene.getObjectByName("Translation_Root"); // this.activeCamera.position.x += ((this.mouse.x*0.4) - this.activeCamera.position.x) * .005
+        // this.activeCamera.position.y += ((this.mouse.y * -0.00000000000000001) - this.activeCamera.position.y) * .03
+        // console.log(t)
+
+        t.rotation.y += (this.mouse.x * -0.3 - t.rotation.y) * .005;
+        t.parent.position.y += (this.mouse.y * 1.1 - t.parent.position.y) * .01; // this.activeCamera.position.copy(this.cameraAnchor)
+      } // this.targetCamPosition = this.
+
+
       this.controls.update();
       this.stats.update();
       this.mixer && this.mixer.update(dt);
@@ -45177,7 +45316,7 @@ function () {
   }, {
     key: "load",
     value: function load(url, rootPath, assetMap) {
-      var _this = this;
+      var _this2 = this;
 
       var baseURL = _three.LoaderUtils.extractUrlBase(url); // Load.
 
@@ -45191,7 +45330,7 @@ function () {
           // See: https://github.com/donmccurdy/three-gltf-viewer/issues/146
           var normalizedURL = rootPath + decodeURI(url).replace(baseURL, '').replace(/^(\.?\/)/, '');
 
-          if (assetMap.has(normalizedURL)) {
+          if (assetMap && assetMap.has(normalizedURL)) {
             var blob = assetMap.get(normalizedURL);
             var blobURL = URL.createObjectURL(blob);
             blobURLs.push(blobURL);
@@ -45215,7 +45354,7 @@ function () {
             throw new Error('This model contains no scene, and cannot be viewed here. However,' + ' it may contain individual 3D resources.');
           }
 
-          _this.setContent(scene, clips);
+          _this2.setContent(scene, clips);
 
           blobURLs.forEach(URL.revokeObjectURL); // See: https://github.com/google/draco/issues/349
           // DRACOLoader.releaseDecoderModule();
@@ -45257,7 +45396,10 @@ function () {
       }
 
       traverseMaterials(object, function (material) {
-        return material.dithering = true;
+        material.dithering = true;
+      });
+      object.traverse(function (obj) {// obj.receiveShadow = true
+        // obj.castShadow = true
       });
       this.setCamera(DEFAULT_CAMERA);
       this.axesCamera.position.copy(this.defaultCamera.position);
@@ -45291,11 +45433,11 @@ function () {
   }, {
     key: "printGraph",
     value: function printGraph(node) {
-      var _this2 = this;
+      var _this3 = this;
 
       console.group(' <' + node.type + '> ' + node.name);
       node.children.forEach(function (child) {
-        return _this2.printGraph(child);
+        return _this3.printGraph(child);
       });
       console.groupEnd();
     }
@@ -45319,12 +45461,12 @@ function () {
   }, {
     key: "playAllClips",
     value: function playAllClips() {
-      var _this3 = this;
+      var _this4 = this;
 
       this.clips.forEach(function (clip) {
-        _this3.mixer.clipAction(clip).reset().play();
+        _this4.mixer.clipAction(clip).reset().play();
 
-        _this3.state.actionStates[clip.name] = true;
+        _this4.state.actionStates[clip.name] = true;
       });
     }
     /**
@@ -45334,7 +45476,7 @@ function () {
   }, {
     key: "setCamera",
     value: function setCamera(name) {
-      var _this4 = this;
+      var _this5 = this;
 
       if (name === DEFAULT_CAMERA) {
         this.controls.enabled = true;
@@ -45343,10 +45485,11 @@ function () {
         this.controls.enabled = false;
         this.content.traverse(function (node) {
           if (node.isCamera && node.name === name) {
-            _this4.activeCamera = node;
+            _this5.activeCamera = node;
           }
         });
-        this.activeCamera.far = 100;
+        this.cameraAnchor = this.activeCamera.position.clone(); // this.activeCamera.far = 100
+
         this.resize();
       }
     }
@@ -45390,6 +45533,8 @@ function () {
 
       this.unrealPass = new _UnrealBloomPass.UnrealBloomPass(this.renderer, new _three.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.4, 0.9);
       this.composer.addPass(this.unrealPass);
+      this.filmGrain = new _FilmPass.FilmPass(.1, 0, 1, 0); // this.composer.addPass( this.filmGrain );
+
       this.unrealPass.st;
       var postUI = this.gui.addFolder('Post Processing');
       postUI.add(this.unrealPass, 'strength', 0, 5);
@@ -45423,22 +45568,36 @@ function () {
       this.scene.add(left);
       this.scene.add(right); // debugger
 
-      window.lightFolder.addFolder('light top').add(top, 'intensity', 0, 5);
-      window.lightFolder.addFolder('light left').add(left, 'intensity', 0, 5);
-      window.lightFolder.addFolder('light right').add(right, 'intensity', 0, 5); // if (this.options.preset === Preset.ASSET_GENERATOR) {
+      window.lightFolder.addFolder('light top').add(top, 'intensity', 0, 10);
+      window.lightFolder.addFolder('light left').add(left, 'intensity', 0, 10);
+      window.lightFolder.addFolder('light right').add(right, 'intensity', 0, 10); // if (this.options.preset === Preset.ASSET_GENERATOR) {
       //   const hemiLight = new HemisphereLight();
       //   hemiLight.name = 'hemi_light';
       //   this.scene.add(hemiLight);
       //   this.lights.push(hemiLight);
       //   return;
       // }
-      // const light1  = new AmbientLight(state.ambientColor, state.ambientIntensity);
+      // const light1  = new DirectionLight(0xffffff, 1);
       // light1.name = 'ambient_light';
-      // this.defaultCamera.add( light1 );
-      // const light2  = new DirectionalLight(state.directColor, state.directIntensity);
-      // light2.position.set(0.5, 0, 0.866); // ~60º
-      // light2.name = 'main_light';
-      // this.defaultCamera.add( light2 );
+      // this.scene.add( light1 );
+
+      var light2 = new _three.DirectionalLight(0xFFFFFF, 8);
+      light2.position.set(0.5, 0, 0.866); // ~60º
+
+      light2.name = 'main_light';
+      this.defaultCamera.add(light2); //     const light2  = new SpotLight(0xff0000, 100, 100);
+      //     light2.castShadow = true
+      //     light2.shadow.mapSize.x = 1024
+      //     light2.shadow.mapSize.y = 1024
+      //     light2.shadow.radius = 5
+      // // light2.shadowCameraVisible = true;
+      //     light2.position.set(0., 3, 0.); // ~60º
+      //     let bb = new Mesh(new BoxBufferGeometry(), new MeshStandardMaterial())
+      //     bb.castShadow = true
+      //     bb.position.y = 1;
+      //     // light2.name = 'main_light';
+      //     this.scene.add( bb );
+      //     this.scene.add( light2 );
       // this.lights.push(top, left);
     } // removeLights () {
     //   this.lights.forEach((light) => light.parent.remove(light));
@@ -45448,10 +45607,10 @@ function () {
   }, {
     key: "updateEnvironment",
     value: function updateEnvironment() {
-      var _this5 = this;
+      var _this6 = this;
 
       var environment = _index.environments.filter(function (entry) {
-        return entry.name === _this5.state.environment;
+        return entry.name === _this6.state.environment;
       })[0];
 
       this.getCubeMapTexture(environment).then(function (_ref2) {
@@ -45461,14 +45620,14 @@ function () {
         // } else {
         //   this.scene.remove(this.vignette);
         // }
-        _this5.scene.environment = envMap;
-        _this5.scene.background = _this5.state.background ? envMap : null;
+        _this6.scene.environment = envMap;
+        _this6.scene.background = _this6.state.background ? envMap : null;
       });
     }
   }, {
     key: "getCubeMapTexture",
     value: function getCubeMapTexture(environment) {
-      var _this6 = this;
+      var _this7 = this;
 
       var path = environment.path; // no envmap
 
@@ -45477,9 +45636,9 @@ function () {
       });
       return new Promise(function (resolve, reject) {
         new _RGBELoader.RGBELoader().setDataType(_three.UnsignedByteType).load(path, function (texture) {
-          var envMap = _this6.pmremGenerator.fromEquirectangular(texture).texture;
+          var envMap = _this7.pmremGenerator.fromEquirectangular(texture).texture;
 
-          _this6.pmremGenerator.dispose();
+          _this7.pmremGenerator.dispose();
 
           resolve({
             envMap: envMap
@@ -45490,29 +45649,29 @@ function () {
   }, {
     key: "updateDisplay",
     value: function updateDisplay() {
-      var _this7 = this;
+      var _this8 = this;
 
       if (this.skeletonHelpers.length) {
         this.skeletonHelpers.forEach(function (helper) {
-          return _this7.scene.remove(helper);
+          return _this8.scene.remove(helper);
         });
       }
 
       traverseMaterials(this.content, function (material) {
-        material.wireframe = _this7.state.wireframe;
+        material.wireframe = _this8.state.wireframe;
       });
       this.content.traverse(function (node) {
         if (node.isMesh && node.material && node.material.map) {
           console.log(node.material);
         }
 
-        if (node.isMesh && node.skeleton && _this7.state.skeleton) {
+        if (node.isMesh && node.skeleton && _this8.state.skeleton) {
           var helper = new _three.SkeletonHelper(node.skeleton.bones[0].parent);
           helper.material.linewidth = 3;
 
-          _this7.scene.add(helper);
+          _this8.scene.add(helper);
 
-          _this7.skeletonHelpers.push(helper);
+          _this8.skeletonHelpers.push(helper);
         }
       });
 
@@ -45567,13 +45726,12 @@ function () {
       this.axesRenderer.setSize(this.axesDiv.clientWidth, this.axesDiv.clientHeight);
       this.axesCamera.up = this.defaultCamera.up;
       this.axesCorner = new _three.AxesHelper(5);
-      this.axesScene.add(this.axesCorner);
-      this.axesDiv.appendChild(this.axesRenderer.domElement);
+      this.axesScene.add(this.axesCorner); // this.axesDiv.appendChild(this.axesRenderer.domElement);
     }
   }, {
     key: "addGUI",
     value: function addGUI() {
-      var _this8 = this;
+      var _this9 = this;
 
       var gui = this.gui = new _dat.GUI({
         autoPlace: false,
@@ -45584,42 +45742,42 @@ function () {
       var dispFolder = gui.addFolder('Display');
       var envBackgroundCtrl = dispFolder.add(this.state, 'background');
       envBackgroundCtrl.onChange(function () {
-        return _this8.updateEnvironment();
+        return _this9.updateEnvironment();
       });
       var wireframeCtrl = dispFolder.add(this.state, 'wireframe');
       wireframeCtrl.onChange(function () {
-        return _this8.updateDisplay();
+        return _this9.updateDisplay();
       });
       var skeletonCtrl = dispFolder.add(this.state, 'skeleton');
       skeletonCtrl.onChange(function () {
-        return _this8.updateDisplay();
+        return _this9.updateDisplay();
       });
       var gridCtrl = dispFolder.add(this.state, 'grid');
       gridCtrl.onChange(function () {
-        return _this8.updateDisplay();
+        return _this9.updateDisplay();
       });
       dispFolder.add(this.controls, 'autoRotate');
       dispFolder.add(this.controls, 'screenSpacePanning');
       var bgColor1Ctrl = dispFolder.addColor(this.state, 'bgColor1');
       var bgColor2Ctrl = dispFolder.addColor(this.state, 'bgColor2');
       bgColor1Ctrl.onChange(function () {
-        return _this8.updateBackground();
+        return _this9.updateBackground();
       });
       bgColor2Ctrl.onChange(function () {
-        return _this8.updateBackground();
+        return _this9.updateBackground();
       }); // Lighting controls.
 
       window.lightFolder = gui.addFolder('Lighting');
       var encodingCtrl = lightFolder.add(this.state, 'textureEncoding', ['sRGB', 'Linear']);
       encodingCtrl.onChange(function () {
-        return _this8.updateTextureEncoding();
+        return _this9.updateTextureEncoding();
       });
       lightFolder.add(this.renderer, 'outputEncoding', {
         sRGB: _three.sRGBEncoding,
         Linear: _three.LinearEncoding
       }).onChange(function () {
-        _this8.renderer.outputEncoding = Number(_this8.renderer.outputEncoding);
-        traverseMaterials(_this8.content, function (material) {
+        _this9.renderer.outputEncoding = Number(_this9.renderer.outputEncoding);
+        traverseMaterials(_this9.content, function (material) {
           material.needsUpdate = true;
         });
       });
@@ -45630,14 +45788,14 @@ function () {
         Cineon: _three.CineonToneMapping,
         Aces: _three.ACESFilmicToneMapping
       }).onChange(function () {
-        _this8.renderer.toneMapping = Number(_this8.renderer.toneMapping);
-        traverseMaterials(_this8.content, function (material) {
+        _this9.renderer.toneMapping = Number(_this9.renderer.toneMapping);
+        traverseMaterials(_this9.content, function (material) {
           material.needsUpdate = true;
         });
       });
       lightFolder.add(this.renderer, 'physicallyCorrectLights').onChange(function () {
-        _this8.renderer.toneMapping = Number(_this8.renderer.toneMapping);
-        traverseMaterials(_this8.content, function (material) {
+        _this9.renderer.toneMapping = Number(_this9.renderer.toneMapping);
+        traverseMaterials(_this9.content, function (material) {
           material.needsUpdate = true;
         });
       });
@@ -45645,7 +45803,7 @@ function () {
         return env.name;
       }));
       envMapCtrl.onChange(function () {
-        return _this8.updateEnvironment();
+        return _this9.updateEnvironment();
       });
       [lightFolder.add(this.state, 'toneMappingExposure', 0, 2) // lightFolder.add(this.state, 'addLights').listen(),
       // lightFolder.add(this.state, 'ambientIntensity', 0, 2),
@@ -45654,7 +45812,7 @@ function () {
       // lightFolder.addColor(this.state, 'directColor')
       ].forEach(function (ctrl) {
         return ctrl.onChange(function () {
-          return _this8.updateLights();
+          return _this9.updateLights();
         });
       }); // Animation controls.
 
@@ -45662,11 +45820,11 @@ function () {
       this.animFolder.domElement.style.display = 'none';
       var playbackSpeedCtrl = this.animFolder.add(this.state, 'playbackSpeed', 0, 1);
       playbackSpeedCtrl.onChange(function (speed) {
-        if (_this8.mixer) _this8.mixer.timeScale = speed;
+        if (_this9.mixer) _this9.mixer.timeScale = speed;
       });
       this.animFolder.add({
         playAll: function playAll() {
-          return _this8.playAllClips();
+          return _this9.playAllClips();
         }
       }, 'playAll'); // Morph target controls.
 
@@ -45693,7 +45851,7 @@ function () {
   }, {
     key: "updateGUI",
     value: function updateGUI() {
-      var _this9 = this;
+      var _this10 = this;
 
       this.cameraFolder.domElement.style.display = 'none';
       this.morphCtrls.forEach(function (ctrl) {
@@ -45725,7 +45883,7 @@ function () {
         var cameraOptions = [DEFAULT_CAMERA].concat(cameraNames);
         this.cameraCtrl = this.cameraFolder.add(this.state, 'camera', cameraOptions);
         this.cameraCtrl.onChange(function (name) {
-          return _this9.setCamera(name);
+          return _this10.setCamera(name);
         });
       }
 
@@ -45733,21 +45891,21 @@ function () {
         this.morphFolder.domElement.style.display = '';
         morphMeshes.forEach(function (mesh) {
           if (mesh.morphTargetInfluences.length) {
-            var nameCtrl = _this9.morphFolder.add({
+            var nameCtrl = _this10.morphFolder.add({
               name: mesh.name || 'Untitled'
             }, 'name');
 
-            _this9.morphCtrls.push(nameCtrl);
+            _this10.morphCtrls.push(nameCtrl);
           }
 
           var _loop = function _loop(i) {
-            var ctrl = _this9.morphFolder.add(mesh.morphTargetInfluences, i, 0, 1, 0.01).listen();
+            var ctrl = _this10.morphFolder.add(mesh.morphTargetInfluences, i, 0, 1, 0.01).listen();
 
             Object.keys(mesh.morphTargetDictionary).forEach(function (key) {
               if (key && mesh.morphTargetDictionary[key] === i) ctrl.name(key);
             });
 
-            _this9.morphCtrls.push(ctrl);
+            _this10.morphCtrls.push(ctrl);
           };
 
           for (var i = 0; i < mesh.morphTargetInfluences.length; i++) {
@@ -45765,22 +45923,22 @@ function () {
 
           if (clipIndex === 0) {
             actionStates[clip.name] = true;
-            action = _this9.mixer.clipAction(clip);
+            action = _this10.mixer.clipAction(clip);
             action.play();
           } else {
             actionStates[clip.name] = false;
           } // Play other clips when enabled.
 
 
-          var ctrl = _this9.animFolder.add(actionStates, clip.name).listen();
+          var ctrl = _this10.animFolder.add(actionStates, clip.name).listen();
 
           ctrl.onChange(function (playAnimation) {
-            action = action || _this9.mixer.clipAction(clip);
+            action = action || _this10.mixer.clipAction(clip);
             action.setEffectiveTimeScale(1);
             playAnimation ? action.play() : action.stop();
           });
 
-          _this9.animCtrls.push(ctrl);
+          _this10.animCtrls.push(ctrl);
         });
       }
     }
@@ -45816,7 +45974,7 @@ function traverseMaterials(object, callback) {
     materials.forEach(callback);
   });
 }
-},{"three":"node_modules/three/build/three.module.js","three/examples/jsm/libs/stats.module.js":"node_modules/three/examples/jsm/libs/stats.module.js","three/examples/jsm/loaders/GLTFLoader.js":"node_modules/three/examples/jsm/loaders/GLTFLoader.js","three/examples/jsm/loaders/DRACOLoader.js":"node_modules/three/examples/jsm/loaders/DRACOLoader.js","three/examples/jsm/controls/OrbitControls.js":"node_modules/three/examples/jsm/controls/OrbitControls.js","three/examples/jsm/loaders/RGBELoader.js":"node_modules/three/examples/jsm/loaders/RGBELoader.js","three/examples/jsm/lights/RectAreaLightUniformsLib.js":"node_modules/three/examples/jsm/lights/RectAreaLightUniformsLib.js","./EffectComposer2.js":"src/EffectComposer2.js","three/examples/jsm/postprocessing/RenderPass.js":"node_modules/three/examples/jsm/postprocessing/RenderPass.js",".//UnrealBloomPass.js":"src/UnrealBloomPass.js","dat.gui":"node_modules/dat.gui/build/dat.gui.module.js","../assets/environment/index.js":"assets/environment/index.js"}],"node_modules/simple-dropzone/dist/simple-dropzone.module.js":[function(require,module,exports) {
+},{"three":"node_modules/three/build/three.module.js","three/examples/jsm/libs/stats.module.js":"node_modules/three/examples/jsm/libs/stats.module.js","three/examples/jsm/loaders/GLTFLoader.js":"node_modules/three/examples/jsm/loaders/GLTFLoader.js","three/examples/jsm/loaders/DRACOLoader.js":"node_modules/three/examples/jsm/loaders/DRACOLoader.js","three/examples/jsm/controls/OrbitControls.js":"node_modules/three/examples/jsm/controls/OrbitControls.js","three/examples/jsm/loaders/RGBELoader.js":"node_modules/three/examples/jsm/loaders/RGBELoader.js","three/examples/jsm/lights/RectAreaLightUniformsLib.js":"node_modules/three/examples/jsm/lights/RectAreaLightUniformsLib.js","./EffectComposer2.js":"src/EffectComposer2.js","three/examples/jsm/postprocessing/RenderPass.js":"node_modules/three/examples/jsm/postprocessing/RenderPass.js","./FilmPass.js":"src/FilmPass.js",".//UnrealBloomPass.js":"src/UnrealBloomPass.js","dat.gui":"node_modules/dat.gui/build/dat.gui.module.js","../assets/environment/index.js":"assets/environment/index.js"}],"node_modules/simple-dropzone/dist/simple-dropzone.module.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -68014,25 +68172,17 @@ function () {
 
   _createClass(ValidationController, [{
     key: "validate",
-    value: function validate(rootFile, rootPath, assetMap, response) {
-      var _this = this;
+    value: function validate(rootFile, rootPath, assetMap, response) {} // TODO: This duplicates a request of the three.js loader, and could
+    // take advantage of THREE.Cache after r90.
+    // return fetch(rootFile)
+    //   .then((response) => response.arrayBuffer())
+    //   .then((buffer) => validateBytes(new Uint8Array(buffer), {
+    //     externalResourceFunction: (uri) =>
+    //       this.resolveExternalResource(uri, rootFile, rootPath, assetMap)
+    //   }))
+    //   .then((report) => this.setReport(report, response))
+    //   .catch((e) => this.setReportException(e));
 
-      // TODO: This duplicates a request of the three.js loader, and could
-      // take advantage of THREE.Cache after r90.
-      return fetch(rootFile).then(function (response) {
-        return response.arrayBuffer();
-      }).then(function (buffer) {
-        return (0, _gltfValidator.validateBytes)(new Uint8Array(buffer), {
-          externalResourceFunction: function externalResourceFunction(uri) {
-            return _this.resolveExternalResource(uri, rootFile, rootPath, assetMap);
-          }
-        });
-      }).then(function (report) {
-        return _this.setReport(report, response);
-      }).catch(function (e) {
-        return _this.setReportException(e);
-      });
-    }
     /**
      * Loads a resource (either locally or from the network) and returns it.
      * @param  {string} uri
@@ -68198,15 +68348,15 @@ function () {
   }, {
     key: "bindListeners",
     value: function bindListeners() {
-      var _this2 = this;
+      var _this = this;
 
       var reportToggleBtn = this.toggleEl.querySelector('.report-toggle');
       reportToggleBtn.addEventListener('click', function () {
-        return _this2.showLightbox();
+        return _this.showLightbox();
       });
       var reportToggleCloseBtn = this.toggleEl.querySelector('.report-toggle-close');
       reportToggleCloseBtn.addEventListener('click', function (e) {
-        _this2.hideToggle();
+        _this.hideToggle();
 
         e.stopPropagation();
       });
@@ -68576,6 +68726,8 @@ function () {
    * @param  {Location} location
    */
   function App(el, location) {
+    var _this = this;
+
     _classCallCheck(this, App);
 
     var hash = location.hash ? _queryString.default.parse(location.hash) : {};
@@ -68591,8 +68743,9 @@ function () {
     this.spinnerEl = el.querySelector('.spinner');
     this.dropEl = el.querySelector('.dropzone');
     this.inputEl = el.querySelector('#file-input');
-    this.validationCtrl = new _validationController.ValidationController(el);
-    this.createDropzone();
+    this.validationCtrl = new _validationController.ValidationController(el); // this.createDropzone();
+
+    this.createViewer();
     this.hideSpinner();
     var options = this.options;
 
@@ -68604,6 +68757,17 @@ function () {
     if (options.model) {
       this.view(options.model, '', new Map());
     }
+
+    this.viewer.load('./assets/choco-world.glb', '/').then(function (gltf) {
+      return _this.viewer.setCamera('Cam');
+    }).catch(function (e) {
+      return _this.onError(e);
+    }); // .then((gltf) => {
+    // if (!this.options.kiosk) {
+    //   this.validationCtrl.validate(fileURL, rootPath, fileMap, gltf);
+    // }
+    // cleanup();
+    // });
   }
   /**
    * Sets up the drag-and-drop controller.
@@ -68613,18 +68777,18 @@ function () {
   _createClass(App, [{
     key: "createDropzone",
     value: function createDropzone() {
-      var _this = this;
+      var _this2 = this;
 
       var dropCtrl = new _simpleDropzone.SimpleDropzone(this.dropEl, this.inputEl);
       dropCtrl.on('drop', function (_ref) {
         var files = _ref.files;
-        return _this.load(files);
+        return _this2.load(files);
       });
       dropCtrl.on('dropstart', function () {
-        return _this.showSpinner();
+        return _this2.showSpinner();
       });
       dropCtrl.on('droperror', function () {
-        return _this.hideSpinner();
+        return _this2.hideSpinner();
       });
     }
     /**
@@ -68679,23 +68843,23 @@ function () {
   }, {
     key: "view",
     value: function view(rootFile, rootPath, fileMap) {
-      var _this2 = this;
+      var _this3 = this;
 
       if (this.viewer) this.viewer.clear();
       var viewer = this.viewer || this.createViewer();
       var fileURL = typeof rootFile === 'string' ? rootFile : URL.createObjectURL(rootFile);
 
       var cleanup = function cleanup() {
-        _this2.hideSpinner();
+        _this3.hideSpinner();
 
         if (_typeof(rootFile) === 'object') URL.revokeObjectURL(fileURL);
       };
 
       viewer.load(fileURL, rootPath, fileMap).catch(function (e) {
-        return _this2.onError(e);
+        return _this3.onError(e);
       }).then(function (gltf) {
-        if (!_this2.options.kiosk) {
-          _this2.validationCtrl.validate(fileURL, rootPath, fileMap, gltf);
+        if (!_this3.options.kiosk) {
+          _this3.validationCtrl.validate(fileURL, rootPath, fileMap, gltf);
         }
 
         cleanup();
@@ -68767,7 +68931,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "62048" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "63465" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

@@ -33,7 +33,11 @@ import {
   BackSide,
   BoxBufferGeometry,
   MeshStandardMaterial,
-  Vector2
+  Vector2,
+  PointLight,
+  PCFSoftShadowMap,
+  VSMShadowMap,
+  SpotLight
 } from 'three';
 import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -46,6 +50,7 @@ RectAreaLightUniformsLib.init()
 
 import { EffectComposer } from './EffectComposer2.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { FilmPass } from './FilmPass.js';
 // import { TAARenderPass  } from 'three/examples/jsm/postprocessing/TAARenderPass.js';
 // import { SMAAPass  } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { UnrealBloomPass } from './/UnrealBloomPass.js';
@@ -100,6 +105,8 @@ export class Viewer {
       skeleton: false,
       grid: false,
 
+
+      
       // Lights
       // addLights: true,
       toneMappingExposure: 1.0,
@@ -111,6 +118,12 @@ export class Viewer {
       bgColor1: '#ffffff',
       bgColor2: '#353535'
     };
+
+    this.mouse = new Vector2()
+    window.addEventListener('mousemove', e => {
+      this.mouse.x = (e.clientX  - (window.innerWidth*0.5))*  0.001
+      this.mouse.y = (e.clientY  - (window.innerHeight*0.5)) * 0.001
+    })
 
     this.prevTime = 0;
 
@@ -130,6 +143,8 @@ export class Viewer {
     this.renderer = window.renderer = new WebGLRenderer({antialias: true});
     this.renderer.physicallyCorrectLights = true;
     this.renderer.outputEncoding = sRGBEncoding;
+    this.renderer.shadowMapType = VSMShadowMap;
+    this.renderer.shadowMap.enabled = true;
     this.renderer.setClearColor( 0xcccccc );
     this.renderer.setPixelRatio( window.devicePixelRatio );
     this.renderer.setSize( el.clientWidth, el.clientHeight );
@@ -178,6 +193,19 @@ export class Viewer {
     requestAnimationFrame( this.animate );
 
     const dt = (time - this.prevTime) / 1000;
+
+    if(!this.controls.enabled){
+      // console.log(this.mouse.x)
+      const t = this.scene.getObjectByName( "Translation_Root" );
+      // this.activeCamera.position.x += ((this.mouse.x*0.4) - this.activeCamera.position.x) * .005
+      // this.activeCamera.position.y += ((this.mouse.y * -0.00000000000000001) - this.activeCamera.position.y) * .03
+      // console.log(t)
+      t.rotation.y += ((this.mouse.x*-0.3) - t.rotation.y) * .005
+      t.parent.position.y += ((this.mouse.y*1.1) - t.parent.position.y) * .01
+      // this.activeCamera.position.copy(this.cameraAnchor)
+    }
+      // this.targetCamPosition = this.
+
 
     this.controls.update();
     this.stats.update();
@@ -230,7 +258,6 @@ export class Viewer {
 
       // Intercept and override relative URLs.
       manager.setURLModifier((url, path) => {
-
         // URIs in a glTF file may be escaped, or not. Assume that assetMap is
         // from an un-escaped source, and decode all URIs before lookups.
         // See: https://github.com/donmccurdy/three-gltf-viewer/issues/146
@@ -238,7 +265,7 @@ export class Viewer {
           .replace(baseURL, '')
           .replace(/^(\.?\/)/, '');
 
-        if (assetMap.has(normalizedURL)) {
+        if (assetMap && assetMap.has(normalizedURL)) {
           const blob = assetMap.get(normalizedURL);
           const blobURL = URL.createObjectURL(blob);
           blobURLs.push(blobURL);
@@ -323,7 +350,14 @@ export class Viewer {
 
     }
 
-    traverseMaterials(object, material => material.dithering = true)
+    traverseMaterials(object, material => {
+      material.dithering = true
+    })
+
+    object.traverse(obj => {
+      // obj.receiveShadow = true
+      // obj.castShadow = true
+    })
 
     this.setCamera(DEFAULT_CAMERA);
 
@@ -413,7 +447,8 @@ export class Viewer {
           this.activeCamera = node;
         }
       });
-      this.activeCamera.far = 100
+      this.cameraAnchor = this.activeCamera.position.clone()
+      // this.activeCamera.far = 100
       this.resize()
     }
   }
@@ -464,6 +499,10 @@ export class Viewer {
 
     this.unrealPass = new UnrealBloomPass(this.renderer, new Vector2( window.innerWidth, window.innerHeight ), 0.5, 0.4, 0.9)
     this.composer.addPass( this.unrealPass );
+
+    this.filmGrain = new FilmPass(.1, 0, 1, 0)
+    // this.composer.addPass( this.filmGrain );
+
     this.unrealPass.st
     const postUI = this.gui.addFolder('Post Processing')
     postUI.add(this.unrealPass, 'strength', 0, 5)
@@ -502,13 +541,13 @@ export class Viewer {
 
     // debugger
     window.lightFolder.addFolder('light top')
-      .add(top, 'intensity', 0, 5)
+      .add(top, 'intensity', 0, 10)
 
     window.lightFolder.addFolder('light left')
-      .add(left, 'intensity', 0, 5)
+      .add(left, 'intensity', 0, 10)
 
     window.lightFolder.addFolder('light right')
-      .add(right, 'intensity', 0, 5)
+      .add(right, 'intensity', 0, 10)
 
     // if (this.options.preset === Preset.ASSET_GENERATOR) {
     //   const hemiLight = new HemisphereLight();
@@ -518,14 +557,29 @@ export class Viewer {
     //   return;
     // }
 
-    // const light1  = new AmbientLight(state.ambientColor, state.ambientIntensity);
+    // const light1  = new DirectionLight(0xffffff, 1);
     // light1.name = 'ambient_light';
-    // this.defaultCamera.add( light1 );
+    // this.scene.add( light1 );
 
-    // const light2  = new DirectionalLight(state.directColor, state.directIntensity);
-    // light2.position.set(0.5, 0, 0.866); // ~60º
-    // light2.name = 'main_light';
-    // this.defaultCamera.add( light2 );
+    const light2  = new DirectionalLight(0xFFFFFF, 8);
+    light2.position.set(0.5, 0, 0.866); // ~60º
+    light2.name = 'main_light';
+    this.defaultCamera.add( light2 );
+
+//     const light2  = new SpotLight(0xff0000, 100, 100);
+//     light2.castShadow = true
+//     light2.shadow.mapSize.x = 1024
+//     light2.shadow.mapSize.y = 1024
+//     light2.shadow.radius = 5
+
+// // light2.shadowCameraVisible = true;
+//     light2.position.set(0., 3, 0.); // ~60º
+//     let bb = new Mesh(new BoxBufferGeometry(), new MeshStandardMaterial())
+//     bb.castShadow = true
+//     bb.position.y = 1;
+//     // light2.name = 'main_light';
+//     this.scene.add( bb );
+//     this.scene.add( light2 );
 
     // this.lights.push(top, left);
   }
@@ -648,7 +702,7 @@ export class Viewer {
 
     this.axesCorner = new AxesHelper(5);
     this.axesScene.add( this.axesCorner );
-    this.axesDiv.appendChild(this.axesRenderer.domElement);
+    // this.axesDiv.appendChild(this.axesRenderer.domElement);
   }
 
   addGUI () {

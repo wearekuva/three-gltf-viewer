@@ -36,7 +36,8 @@ class App {
     this.inputEl = el.querySelector('#file-input');
     this.validationCtrl = new ValidationController(el);
 
-    this.createDropzone();
+    // this.createDropzone();
+    this.createViewer();
     this.hideSpinner();
 
     const options = this.options;
@@ -49,6 +50,17 @@ class App {
     if (options.model) {
       this.view(options.model, '', new Map());
     }
+
+    this.viewer
+      .load('./assets/choco-world.glb', '/')
+      .then(gltf => this.viewer.setCamera('Cam'))
+      .catch((e) => this.onError(e))
+      // .then((gltf) => {
+        // if (!this.options.kiosk) {
+        //   this.validationCtrl.validate(fileURL, rootPath, fileMap, gltf);
+        // }
+        // cleanup();
+      // });
   }
 
   /**
